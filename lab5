@@ -1,0 +1,222 @@
+-- =========================================================================
+-- 1. СОЗДАНИЕ БАЗЫ ДАННЫХ (CREATE DATABASE)
+-- =========================================================================
+CREATE DATABASE IF NOT EXISTS warehouse_clothing_db;
+USE warehouse_clothing_db;
+
+
+-- =========================================================================
+-- 2. СОЗДАНИЕ ТАБЛИЦ И СВЯЗЕЙ (CREATE TABLE)
+-- =========================================================================
+
+-- Таблица: Справочник моделей одежды
+CREATE TABLE clothing_design (
+    sku VARCHAR(255) NOT NULL,
+    brand VARCHAR(255) NOT NULL,
+    model_name VARCHAR(255) NOT NULL,
+    category VARCHAR(255) NOT NULL,
+    sex VARCHAR(255) NOT NULL,
+    size VARCHAR(255) NOT NULL,
+    color VARCHAR(255) NOT NULL,
+    material VARCHAR(255) NOT NULL,
+    retail_price DECIMAL(8, 2) NOT NULL,
+    PRIMARY KEY (sku)
+);
+
+-- Таблица: Справочник поставщиков
+CREATE TABLE suppliers (
+    code_suppliers BIGINT NOT NULL AUTO_INCREMENT,
+    supplier_name VARCHAR(255) NOT NULL,
+    country VARCHAR(255) NOT NULL,
+    inn VARCHAR(255) NOT NULL,
+    phone_number VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    office_address VARCHAR(255) NOT NULL,
+    PRIMARY KEY (code_suppliers)
+);
+
+-- Таблица: Заказы поставщикам (Шапка документа)
+CREATE TABLE orders_to_suppliers (
+    order_number BIGINT NOT NULL AUTO_INCREMENT,
+    code_supplier BIGINT NOT NULL,
+    order_date DATE NOT NULL,
+    PRIMARY KEY (order_number),
+    FOREIGN KEY (code_supplier) REFERENCES suppliers(code_suppliers)
+);
+
+-- Таблица: Строки заказов (Спецификация) - СОСТАВНОЙ КЛЮЧ
+CREATE TABLE orders_lines (
+    order_number BIGINT NOT NULL,
+    sku VARCHAR(255) NOT NULL,
+    order_quantity BIGINT NOT NULL,
+    PRIMARY KEY (order_number, sku),
+    FOREIGN KEY (order_number) REFERENCES orders_to_suppliers(order_number),
+    FOREIGN KEY (sku) REFERENCES clothing_design(sku)
+);
+
+-- Таблица: Поступления грузов (Шапка документа)
+CREATE TABLE receiving_shipments (
+    waybill_number BIGINT NOT NULL AUTO_INCREMENT,
+    delivery_date DATE NOT NULL,
+    code_suppliers BIGINT NOT NULL,
+    PRIMARY KEY (waybill_number),
+    FOREIGN KEY (code_suppliers) REFERENCES suppliers(code_suppliers)
+);
+
+-- Таблица: Строки приемки (Спецификация) - СОСТАВНОЙ КЛЮЧ
+CREATE TABLE receiving_lines (
+    waybill_number BIGINT NOT NULL,
+    sku VARCHAR(255) NOT NULL,
+    quantity_accepted BIGINT NOT NULL,
+    purchase_price DECIMAL(8, 2) NOT NULL,
+    PRIMARY KEY (waybill_number, sku),
+    FOREIGN KEY (waybill_number) REFERENCES receiving_shipments(waybill_number),
+    FOREIGN KEY (sku) REFERENCES clothing_design(sku)
+);
+
+-- Таблица: Перемещения в торговый зал (Шапка документа)
+CREATE TABLE transfer_sales_floor (
+    transfer_number BIGINT NOT NULL AUTO_INCREMENT,
+    transfer_date DATE NOT NULL,
+    PRIMARY KEY (transfer_number)
+);
+
+-- Таблица: Строки перемещений (Спецификация) - СОСТАВНОЙ КЛЮЧ
+CREATE TABLE transfer_lines (
+    transfer_number BIGINT NOT NULL,
+    sku VARCHAR(255) NOT NULL,
+    quantity_moved BIGINT NOT NULL,
+    destination_zone VARCHAR(255) NOT NULL,
+    PRIMARY KEY (transfer_number, sku),
+    FOREIGN KEY (transfer_number) REFERENCES transfer_sales_floor(transfer_number),
+    FOREIGN KEY (sku) REFERENCES clothing_design(sku)
+);
+
+-- Таблица: Инвентаризация (Шапка документа)
+CREATE TABLE inventory (
+    inventory_number BIGINT NOT NULL AUTO_INCREMENT,
+    inventory_date DATE NOT NULL,
+    PRIMARY KEY (inventory_number)
+);
+
+-- Таблица: Строки инвентаризации (Спецификация) - СОСТАВНОЙ КЛЮЧ
+CREATE TABLE inventory_lines (
+    inventory_number BIGINT NOT NULL,
+    sku VARCHAR(255) NOT NULL,
+    actual_quantity BIGINT NOT NULL,
+    `condition` VARCHAR(255) NOT NULL,
+    PRIMARY KEY (inventory_number, sku),
+    FOREIGN KEY (inventory_number) REFERENCES inventory(inventory_number),
+    FOREIGN KEY (sku) REFERENCES clothing_design(sku)
+);
+
+-- Таблица: Чеки продаж (Шапка документа)
+CREATE TABLE sales_receipts (
+    receipt_number BIGINT NOT NULL AUTO_INCREMENT,
+    date_time DATETIME NOT NULL,
+    payment_type VARCHAR(255) NOT NULL,
+    PRIMARY KEY (receipt_number)
+);
+
+-- Таблица: Строки чеков (Спецификация) - СОСТАВНОЙ КЛЮЧ
+CREATE TABLE receipts_lines (
+    receipt_number BIGINT NOT NULL,
+    sku VARCHAR(255) NOT NULL,
+    sales_quantity BIGINT NOT NULL,
+    selling_price DECIMAL(8, 2) NOT NULL,
+    PRIMARY KEY (receipt_number, sku),
+    FOREIGN KEY (receipt_number) REFERENCES sales_receipts(receipt_number),
+    FOREIGN KEY (sku) REFERENCES clothing_design(sku)
+);
+
+
+-- =========================================================================
+-- 3. ИЗМЕНЕНИЕ СТРУКТУРЫ ТАБЛИЦ (ALTER TABLE)
+-- =========================================================================
+-- Добавим индексы для ускорения связывания и поиска (как в исходном коде)
+ALTER TABLE orders_to_suppliers ADD INDEX idx_orders_code_supplier (code_supplier);
+ALTER TABLE receiving_shipments ADD INDEX idx_receiving_code_suppliers (code_suppliers);
+
+
+-- =========================================================================
+-- 4. ВСТАВКА ЗАПИСЕЙ (INSERT INTO)
+-- =========================================================================
+-- Заполнение каталога одежды
+INSERT INTO clothing_design (sku, brand, model_name, category, sex, size, color, material, retail_price) VALUES
+('TSH-001-BLK', 'Zara', 'Футболка Оверсайз', 'Футболки', 'Unisex', 'L', 'Черный', 'Хлопок', 1800.00),
+('JNS-002-BLU', 'Levis', 'Джинсы 501 Classic', 'Брюки', 'Male', '32/34', 'Синий', 'Деним', 8500.00);
+
+-- Заполнение справочника поставщиков
+INSERT INTO suppliers (supplier_name, country, inn, phone_number, email, office_address) VALUES
+('ООО Модный Текстиль', 'Россия', '7701234567', '+74950001122', 'opt@modatex.ru', 'г. Москва, ул. Мира, 12'),
+('Global Cargo Ltd', 'Турция', '9909123456', '+902123334455', 'info@globalcargo.tr', 'Стамбул, пр. Ататюрка, 4');
+
+-- Создание документов
+INSERT INTO orders_to_suppliers (code_supplier, order_date) VALUES (1, '2026-11-01');
+INSERT INTO orders_lines (order_number, sku, order_quantity) VALUES (1, 'TSH-001-BLK', 50);
+
+INSERT INTO receiving_shipments (delivery_date, code_suppliers) VALUES ('2026-11-05', 1);
+INSERT INTO receiving_lines (waybill_number, sku, quantity_accepted, purchase_price) VALUES (1, 'TSH-001-BLK', 50, 700.00);
+
+INSERT INTO transfer_sales_floor (transfer_date) VALUES ('2026-11-06');
+INSERT INTO transfer_lines (transfer_number, sku, quantity_moved, destination_zone) VALUES (1, 'TSH-001-BLK', 20, 'Стеллаж А1');
+
+INSERT INTO inventory (inventory_date) VALUES ('2026-11-07');
+INSERT INTO inventory_lines (inventory_number, sku, actual_quantity, `condition`) VALUES (1, 'TSH-001-BLK', 20, 'Новое');
+
+INSERT INTO sales_receipts (date_time, payment_type) VALUES ('2026-11-07 14:30:00', 'Карта');
+INSERT INTO receipts_lines (receipt_number, sku, sales_quantity, selling_price) VALUES (1, 'TSH-001-BLK', 1, 1800.00);
+
+
+-- =========================================================================
+-- 5. ОБНОВЛЕНИЕ ЗАПИСЕЙ (UPDATE)
+-- =========================================================================
+-- Изменение розничной цены для товара
+UPDATE clothing_design SET retail_price = 1950.00 WHERE sku = 'TSH-001-BLK';
+
+
+-- =========================================================================
+-- 6. УДАЛЕНИЕ ЗАПИСЕЙ (DELETE FROM)
+-- =========================================================================
+-- Пример удаления ошибочной строки перемещения 
+DELETE FROM transfer_lines WHERE transfer_number = 1 AND sku = 'JNS-002-BLU';
+
+
+-- =========================================================================
+-- 7. СОЗДАНИЕ ПОЛЬЗОВАТЕЛЕЙ И НАДЕЛЕНИЕ ПРАВАМИ (CREATE USER / GRANT)
+-- =========================================================================
+-- Менеджер по закупкам (Управляет каталогом, поставщиками и заказами)
+CREATE USER 'procurement_mgr'@'localhost' IDENTIFIED BY 'SecureProc123!';
+GRANT SELECT, INSERT, UPDATE ON warehouse_clothing_db.clothing_design TO 'procurement_mgr'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON warehouse_clothing_db.suppliers TO 'procurement_mgr'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON warehouse_clothing_db.orders_to_suppliers TO 'procurement_mgr'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON warehouse_clothing_db.orders_lines TO 'procurement_mgr'@'localhost';
+
+-- Кладовщик (Приемка, Перемещения, Инвентаризация)
+CREATE USER 'warehouse_keeper'@'localhost' IDENTIFIED BY 'StoreKeep789!';
+GRANT SELECT ON warehouse_clothing_db.clothing_design TO 'warehouse_keeper'@'localhost';
+GRANT SELECT, INSERT ON warehouse_clothing_db.receiving_shipments TO 'warehouse_keeper'@'localhost';
+GRANT SELECT, INSERT ON warehouse_clothing_db.receiving_lines TO 'warehouse_keeper'@'localhost';
+GRANT SELECT, INSERT ON warehouse_clothing_db.transfer_sales_floor TO 'warehouse_keeper'@'localhost';
+GRANT SELECT, INSERT ON warehouse_clothing_db.transfer_lines TO 'warehouse_keeper'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON warehouse_clothing_db.inventory TO 'warehouse_keeper'@'localhost';
+GRANT SELECT, INSERT, UPDATE ON warehouse_clothing_db.inventory_lines TO 'warehouse_keeper'@'localhost';
+
+FLUSH PRIVILEGES;
+
+
+-- =========================================================================
+-- 8. ВЫГРУЗКА МЕТАДАННЫХ ТАБЛИЦ (DESCRIBE)
+-- =========================================================================
+DESCRIBE clothing_design;
+DESCRIBE suppliers;
+DESCRIBE orders_to_suppliers;
+DESCRIBE orders_lines;
+DESCRIBE receiving_shipments;
+DESCRIBE receiving_lines;
+DESCRIBE transfer_sales_floor;
+DESCRIBE transfer_lines;
+DESCRIBE inventory;
+DESCRIBE inventory_lines;
+DESCRIBE sales_receipts;
+DESCRIBE receipts_lines;
