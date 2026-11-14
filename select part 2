@@ -1,0 +1,100 @@
+--1.   Вложенные подзапросы (запрос в запросе), в т.ч. использовать операторы IN, ALL
+
+--(Вывести список всех моделей одежды, которые хотя бы один раз реально продавались, то есть их артикул SKU присутствует в таблице строк чеков).
+
+SELECT `Clothing design`.`SKU`, `Clothing design`.`brand`, `Clothing design`.`model_name`
+FROM `Clothing design`
+WHERE `Clothing design`.`SKU` IN (SELECT `receipts_lines`.`SKU` FROM `receipts_lines`);
+
+
+--2.   Использование «функций управления потоком» (IF, CASE) в соответствии с бизнес-логикой задачи
+
+--(Вывести список проданных позиций, добавив текстовый статус-оценку в зависимости от цены продажи.)
+
+SELECT 
+    `receipts_lines`.`SKU`, 
+    `receipts_lines`.`selling_price`,
+    CASE 
+        WHEN `receipts_lines`.`selling_price` < 2000 THEN 'Бюджетный сегмент'
+        WHEN `receipts_lines`.`selling_price` BETWEEN 2000 AND 7000 THEN 'Средний чек'
+        ELSE 'Премиум товар'
+    END AS `price_category`
+FROM `receipts_lines`;
+
+
+
+
+--3.   Создание одного представления на наиболее популярный запрос (CREATE VIEW) и временное представление – оператор WITH
+
+--(Создать в базе виртуальную "сохраненную" таблицу, которая всегда показывает только сегодняшние чеки, чтобы кассиру не писать длинный запрос каждый раз. CREATE VIEW)
+
+CREATE VIEW `todays_sales_view` AS
+SELECT `receipt_number`, `date_time`, `payment_type`
+FROM `sales_receipts`
+WHERE DATE(`date_time`) = CURDATE();
+
+--(Создать временную таблицу прямо внутри запроса для подсчета общей суммы принятого товара. WITH)
+
+
+WITH `total_received_cte` AS (
+    SELECT `waybill_number`, SUM(`quantity_accepted`) AS `total_quantity`
+    FROM `receiving_lines`
+    GROUP BY `waybill_number`
+)
+SELECT `waybill_number`, `total_quantity`
+FROM `total_received_cte`
+WHERE `total_quantity` > 30;
+
+
+
+
+--4.   Выполнить анализ и оптимизацию запросов средствами EXPLAIN и созданием индексов (CREATE INDEX)
+
+--(Попросить базу данных показать план выполнения запроса, как именно она собирается искать данные в каталоге. EXPLAIN)
+
+EXPLAIN SELECT * FROM `Clothing design` WHERE `brand` = 'Zara';
+
+--Создание индекса CREATE INDEX для ускорения:
+
+CREATE INDEX `idx_clothing_brand` ON `Clothing design` (`brand`);
+
+
+
+
+--5.   Использовать механизм транзакций (START TRANSACTION) для своей предметной области
+
+--(Обезопасить базу данных. При перемещении товара нужно одновременно создать шапку документа и строки спецификации. Если на втором шаге произойдет сбой (например, выключится свет), транзакция отменит всю операцию целиком, чтобы в базе не завис «пустой» документ.)
+
+START TRANSACTION;
+
+-- Шаг 1: Создаем шапку документа перемещения
+INSERT INTO `transfer_sales_floor` (`transfer_date`) 
+VALUES ('2026-11-13');
+
+-- Шаг 2: Создаем строку перемещения товара (используя LAST_INSERT_ID() для связи с шапкой)
+INSERT INTO `transfer_lines` (`transfer_number`, `SKU`, `quantity_moved`, `destination_zone`) 
+VALUES (LAST_INSERT_ID(), 'TSH-001-BLK', 5, 'Витрина у входа');
+
+COMMIT;
+
+
+--6.   Один из запросов на выборку записать и выполнить средствами операторов PREPARE, EXECUTE, DEALLOCAT
+
+--(Создать шаблон запроса в памяти сервера для быстрого поиска цены товара по сканируемому артикулу.)
+
+-- Шаг 1: Готовим шаблон запроса с переменной-знаком вопроса (?)
+PREPARE `get_product_price_stmt` FROM 
+'SELECT `SKU`, `retail_price` FROM `Clothing design` WHERE `SKU` = ?';
+
+-- Шаг 2: Создаем переменную в phpMyAdmin с кодом товара
+SET @target_sku = 'TSH-001-BLK';
+
+-- Шаг 3: Выполняем подстановку переменной в наш шаблон
+EXECUTE `get_product_price_stmt` USING @target_sku;
+
+-- Шаг 4: Очищаем оперативную память сервера от шаблона
+DEALLOCATE PREPARE `get_product_price_stmt`;
+
+
+
+
