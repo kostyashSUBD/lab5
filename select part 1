@@ -1,0 +1,59 @@
+-- Для категорийного менеджера или Продавца-консультанта. (Анализ и просмотр ассортимента товаров в магазине )
+SELECT `SKU`, `brand`, `model_name` -- выбираем колонки 
+FROM `Clothing design`   -- выбираем таблицу откуда берем данные
+ORDER BY `category`, `brand`;   -- Сортировка по алфавиту сначала по категории а потом по бренду отдельно
+
+
+-- Для менеджера по закупкам 
+SELECT 
+    `orders_to_suppliers`.`order_number`, -- выбираем таблицу и через точку строчку которую нам надо вывести на экран
+    `orders_to_suppliers`.`order_date`, 
+    `orders_to_suppliers`.`code_supplier`
+FROM 
+    `orders_to_suppliers`, -- выбор таблиц из которых мы будем брать данные
+    `suppliers`
+WHERE 
+    `orders_to_suppliers`.`code_supplier` = `suppliers`.`code_suppliers`  -- связываем код поставщика из журанала закозов с кодом из таблицы поставщики 
+ORDER BY 
+    `orders_to_suppliers`.`order_date` DESC; --сортировка по убыванию (desc) готовых колонок их селекта 
+
+
+
+-- Для кладовщика или продавца-консультанта
+SELECT 
+    `transfer_lines`.`destination_zone`,                     --выводим строку зоны назначения 
+    SUM(`transfer_lines`.`quantity_moved`) AS `total_qty`    -- выводится сумма ед. товра которая была перемещена в каждую из торговых зон 
+    --берется поле кол-во перемещения из таблицы строк перемещения и складывает все числа для каждой зоны (после группировки по зонам)
+FROM 
+    `transfer_lines`   --берем данные из таблицы строк перемещения 
+GROUP BY 
+    `transfer_lines`.`destination_zone`  -- группируем записи по строке `destination_zone` (зона назначения)
+HAVING 
+    `total_qty` > 10; -- фильтр, который работатет после группировки и подсчета суммы и выоди только те записи, которые больше 10
+
+
+    --as это так называем новое поле (строку)
+    -- кол-во общих продаж, сред цена товара, сколько позиций пробили на кассе, макс и мин цена вещи
+
+    --Для кассира или Администратора
+SELECT 
+    SUM(`receipts_lines`.`sales_quantity`) AS `total_sold`,
+    AVG(`receipts_lines`.`selling_price`) AS `avg_price`,
+    COUNT(`receipts_lines`.`SKU`) AS `total_rows`,
+    MAX(`receipts_lines`.`selling_price`) AS `max_price`,
+    MIN(`receipts_lines`.`selling_price`) AS `min_price`
+FROM 
+    `receipts_lines`; -- берем данный из таблицы строки чеков
+
+
+SELECT 
+    `Clothing design`.`category`, 
+    SUM(`receipts_lines`.`sales_quantity` * `receipts_lines`.`selling_price`) AS `revenue`   --тут в кажой категори отдельно
+FROM                                                                                         -- умножаем и складываем (кол-во на цену), выводим в столбец выручка
+    `receipts_lines`
+INNER JOIN 
+    `Clothing design` ON `receipts_lines`.`SKU` = `Clothing design`.`SKU`  -- склеиваем строку из таб. стр.чека с артикулом со строкой арт. из таб. модели одежды
+GROUP BY                                                                   -- (по артикулу) беря информацию из таблицы модели одежды
+    `Clothing design`.`category` -- группируем по категориям
+HAVING 
+    `revenue` > 5000.00; --сравнивает по выручке где больше 5к - ту и выводит
